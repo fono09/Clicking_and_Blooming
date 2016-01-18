@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Three.js</title>
+<meta name="viewport" content="width=device-width,height=device-height,user-scalable=no">
+<style type="text/css">
+body {
+	margin: 0px;
+	border: 0px;
+	padding: 0px;
+}
+canvas {
+	margin: 0px;
+	border: 0px;
+	padding: 0px;
+}
+</style>
+</head>
+<body>
+<script src="js/three.min.js"></script>
+<script src="js/FontUtils.js"></script>
+<script src="js/TextGeometry.js"></script>
+<script src="js/helvetiker_regular.typeface.js"></script>
+<script>
+'use strict';
+		
+class Title extends THREE.Mesh {
+
+	constructor(){
+		super(
+			new THREE.TextGeometry('Clicking and Blooming',{size: 1, height: 1, color: random_color(), font: 'helvetiker'}),
+			new THREE.MeshPhongMaterial({color: random_color()})
+		);
+		THREE.GeometryUtils.center(this.geometry);
+		this.position.z = 20;
+		scene.add(this);
+	}
+
+	remove(){
+		scene.remove(this);
+		this.material.dispose();
+		this.geometry.dispose();
+	}
+
+}
+
+class Menu extends THREE.Mesh {
+	
+	constructor(text, mode, x, y){
+		super(
+			new THREE.TextGeometry(text,{size: 1, height: 1, color: random_color(), font: 'helvetiker'}),
+			new THREE.MeshPhongMaterial({color: random_color()})
+		);
+		THREE.GeometryUtils.center(this.geometry);
+		this.position.x = x;
+		this.position.y = y;
+		this.position.z = 5;
+		this.mode = mode;
+		this.clickable = true;
+		scene.add(this);
+	}
+
+	remove(){
+		scene.remove(this);
+		this.material.dispose();
+		this.geometry.dispose();
+	}
+
+	clicked(elem){
+		transitioning = true;
+		this.remove();
+		console.log(scene.children.length);
+
+		var Spheres = [];
+		var Texts = [];
+		scene.children.forEach(function(elem, idx, arr){
+			if(elem instanceof Sphere){
+				Spheres.push(elem);
+			}else if(elem instanceof Menu || elem instanceof Title){
+				Texts.push(elem);
+			}
+		});
+		Spheres.forEach(function(elem, idx, arr){
+			elem.explode();
+		});
+		Texts.forEach(function(elem, idx, arr){
+			elem.remove();
+		});
+
+		console.log(elem.object.mode);
+		mode = elem.object.mode;
+		transitioning = false;
+	}
+
+}
+
+class Explosion extends THREE.Points {
+
+	constructor(position, color){
+		var g = new THREE.Geometry;
+		var objects = 200;
+		var speed = 0.1;
+		var size = 0.1;
+		var timer = 60 * 5;
+		for(var i = 0; i < objects; i++){
+			var vartex = new THREE.Vector3();
+			vartex.x = position.x;
+			vartex.y = position.y;
+			vartex.z = position.z;
+			g.vertices.push(vartex);
+		}
+		var m = new THREE.PointsMaterial({size: size, color: color});
+		super(g, m);
+		this.dirs = [];
+		for(var i = 0; i < objects; i++){
+			var vec = new THREE.Vector3(speed, 0, 0);
+			[new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)].forEach(function(elem, idx, arr){
+				vec.applyAxisAngle( elem, 2*Math.PI*Math.random() );
+			});
+			this.dirs.push(vec);
+		}
+		console.log(this.dirs);
+
+		var vec = new THREE.Vector3(speed, 0, 0);
+		[new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, 1, 0), new THREE.Vector3(0, 0, 1)].forEach(function(elem, idx, arr){
+			vec.applyAxisAngle( elem, 2*Math.PI*Math.random() );
+		});
+
+		this.xDir = vec.x;
+		this.yDir = vec.y;
+		this.zDir = vec.z;
+
+		this.clickable = false;
+		this.status = true;
+		this.timer = timer;
+		console.log("explode!",this);
+		scene.add(this);
+	}
+
+	tick(){
+		if(this.status == true){
+			var i = this.dirs.length;
+			while(i--){
+				var particle = this.geometry.vertices[i];
+				particle.setX(particle.x+this.dirs[i].x);
+				particle.setY(particle.y+this.dirs[i].y);
+				particle.setZ(particle.z+this.dirs[i].z);
+			}
+			this.geometry.verticesNeedUpdate = true;
+			this.timer--;
+			if(this.timer == 0){
+				this.status == false;
+				this.remove();
+			}
+		}
+	}
+
+	remove(){
+		scene.remove(this);
+		this.material.dispose();
+		this.geometry.dispose();
+	}
+}
+
+class Sphere extends THREE.Mesh {
+
+	constructor(){
+		var radius = 1.5;
+		var distance_limit = 10;
+		super(new THREE.SphereGeometry(radius), new THREE.MeshPhongMaterial({color: random_color() }));
+		this.radius = radius;
+		this.speed = range_random(5,50)/10;
+		this.clickable = false;
+		this.position.x = range_random(-distance_limit, distance_limit);
+		this.position.y = range_random(this.radius, Math.sqrt(Math.pow(distance_limit,2) - Math.pow(this.position.x,2)));
+		this.position.z = -1000;
+		this.click_limit = 50;
+		scene.add(this);
+	}
+
+	tick(){
+		this.position.z += this.speed;
+		if(this.position.z > camera.position.z){
+			this.remove();
+		}
+	}
+
+	remove(){
+		scene.remove(this);
+		this.material.dispose();
+		this.geometry.dispose();
+	}
+
+	explode(){
+		var explosion = new Explosion(this.position, this.material.color);
+		this.remove();
+	}
+		
+	clicked(elem){
+		console.log(elem);
+		if(elem.distance < this.click_limit){
+			recorder.points += Math.floor(this.click_limit / elem.distance * 100);
+			console.log("removed");
+			this.explode();
+		}
+	}
+
+}
+
+var range_random = function(a, b){
+	var offset = a;
+	var width = b - a + 1;
+	return Math.floor(Math.random()*width + offset);
+}
+
+var random_color = function(){
+	return 'hsl(' + range_random(0, 360) + ', 100%,' + range_random(50, 100) + '%)';
+}
+
+var width = window.innerWidth - 20;
+var height = window.innerHeight - 20;
+var start_time = Date.now();
+var sphere_freq = 20;
+var mode = 0;
+var before_mode = -1;
+var transitioning = false;
+var isModeChanged = function(){
+	if(mode != before_mode){
+		before_mode = mode;
+		return true;
+	}else{
+		return false;
+	}
+}
+var recorder = {
+	start_time: 0,
+        elapsed_time: 0,
+	points: 0,
+	start: function(){
+		recorder.start_time = new Date().getTime();
+	},
+	tick: function(){
+		recorder.elapsed_time = new Date().getTime() - recorder.start_time;
+	},
+}
+
+var scene = new THREE.Scene();
+
+var camera = new THREE.PerspectiveCamera(75, width / height, 0.1, 1000);
+camera.position.z = 30;
+
+var renderer = new THREE.WebGLRenderer();
+renderer.setSize(width, height);
+renderer.setClearColor(new THREE.Color(0x000000));
+
+var pointLight = new THREE.PointLight(0xffffffff, 1, 100);
+pointLight.position.set(0, 0, 30);
+scene.add(pointLight);
+
+var ambientLight = new THREE.AmbientLight(0x222222);
+scene.add(ambientLight);
+
+var plane = new THREE.Mesh(new THREE.PlaneGeometry(1000, 1000), new THREE.MeshPhongMaterial({color: 0xff0000}));
+plane.position.y = -1 / 2;
+plane.rotation.x = -Math.PI / 2;
+scene.add(plane);
+
+var raycaster = new THREE.Raycaster();
+var mouse = new THREE.Vector2();
+
+document.body.appendChild(this.renderer.domElement);
+
+var clickEvent = function(e){
+	if(e.target == renderer.domElement){
+		mouse.x =  (e.clientX / renderer.domElement.width) * 2 - 1;
+		mouse.y = -(e.clientY / renderer.domElement.height) * 2 + 1;
+
+		raycaster.setFromCamera(mouse, camera);
+		raycaster.intersectObjects(scene.children).forEach(function(elem, idx, arr){
+			if(elem.object.clicked != null && elem.object.clickable == true)elem.object.clicked(elem);
+		});
+	}
+};
+var touchEvent = function(e){
+	if(e.targetTouches.length == 1 && e.touches[0].target == renderer.domElement){
+		mouse.x =  (e.touches[0].clientX / renderer.domElement.width) * 2 - 1;
+		mouse.y = -(e.touches[0].clientY / renderer.domElement.height) * 2 + 1;
+		
+		raycaster.setFromCamera(mouse, camera);
+		raycaster.intersectObjects(scene.children).forEach(function(elem, idx, arr){
+			if(elem.object.clicked != null)elem.object.clicked(elem);
+		});
+	}
+}
+
+var tick = function(){
+	requestAnimationFrame(tick);
+
+	var now = Date.now() - start_time;
+	if(mode == 0){
+		//Title + Menu
+		if(isModeChanged() == true){
+			var title  = new Title();
+			var play = new Menu('TimeTrial', 1, 5, 5);
+			var endless = new Menu('Endless', 2, 5, 10);
+		}
+
+		if(range_random(0,100) < sphere_freq && transitioning == false){
+			var sphere = new Sphere();
+		}
+	}else if(mode == 1){
+		//Time trial
+		if(isModeChanged() == true){
+			recorder.start();
+		}
+		recorder.tick();
+		if(recorder.elapsed_time > 30000){
+			alert("Game Over!!\n Your Record is " + recorder.points);
+			transitioning = true;
+			var Spheres = [];
+			scene.children.forEach(function(elem, idx, arr){
+				if(elem instanceof Sphere){
+					Spheres.push(elem);
+				}else if(elem instanceof Menu || elem instanceof Title){
+					Texts.push(elem);
+				}
+			});
+			Spheres.forEach(function(elem, idx, arr){
+				elem.explode();
+			});
+			mode = 0;
+			transitioning = false;
+		}
+		if(range_random(0,100) < sphere_freq && transitioning == false){
+			var sphere = new Sphere();
+			sphere.clickable = true;
+		}
+
+	}else if(mode == 2){
+		//Endless 
+		if(isModeChanged() == true){
+		}
+		if(range_random(0,100) < sphere_freq && transitioning == false){
+			var sphere = new Sphere();
+			sphere.clickable = true;
+		}
+	}else{
+		alert("error!!!");
+	}
+	
+	scene.children.forEach(
+		function(elem, idx, arr){
+			if(elem.tick != null){
+				elem.tick();
+			}
+		}
+	);
+
+
+	renderer.render(scene, camera);
+}
+tick();
+
+window.onmousedown = clickEvent;
+window.ontouchstart = touchEvent;
+
+</script>
+</body>
+</html>
