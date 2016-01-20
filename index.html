@@ -315,7 +315,20 @@ var tick = function(){
 		}
 		recorder.tick();
 		if(recorder.elapsed_time > 30000){
+			if(!localStorage.bestScore){
+				localStorage.bestScore = recorder.points;
+			}else{
+				if(localStorage.bestScore < recorder.points){
+					var before_points = localStorage.bestScore;
+					localStorage.bestScore = recorder.points;
+
+					alert('New record!! +' + (recorder.points - before_points) + 'points!!');
+				}
+			}
 			alert("Game Over!!\n Your Record is " + recorder.points);
+			if(window.confirm('Share on Twitter?')){
+				window.open('http://twitter.com/intent/tweet?text=I gain '+ recorder.points + 'points in %2523Clicking_and_Blooming https://fono.jp/three','_blank','width=550,height=480,left=100,top=50,scrollbars=1,resizable=1',0);
+			}
 			transitioning = true;
 			var Spheres = [];
 			scene.children.forEach(function(elem, idx, arr){
